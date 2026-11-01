@@ -37,9 +37,13 @@ class MirrorSync(
         var changed = 0
         val seen = HashSet<String>()
         for (calId in ids) {
-            val rows = runCatching { local.rows(calId, asSyncAdapter = false) }.getOrElse {
-                Log.w("SkiCalSync", "Can't read calendar $calId", it); continue
-            }.filter { !it.deleted }
+            val all = runCatching { local.rows(calId, asSyncAdapter = false) }
+            if (all.isFailure) {
+                Log.w("SkiCalSync", "Can't read calendar $calId", all.exceptionOrNull())
+                seen += map.keys.filter { it.startsWith("$calId:") } // keep its iCloud copies
+                continue
+            }
+            val rows = all.getOrThrow().filter { !it.deleted }
             val exceptions = rows.filter { it.originalId != null }.groupBy { it.originalId!! }
 
             for (m in rows.filter { it.originalId == null }) {
